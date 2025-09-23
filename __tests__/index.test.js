@@ -12,7 +12,7 @@ import {
   withRetry,
   startTimer,
   maskString
-} from '../index.js';
+} from '../src/index.js';
 
 afterEach(() => {
   jest.restoreAllMocks();

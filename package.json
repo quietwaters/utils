@@ -1,29 +1,51 @@
 {
   "name": "@quietwaters/utils",
   "version": "0.0.1-alpha.1",
-  "main": "index.js",
+  "description": "",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./date": {
+      "import": "./dist/date.js",
+      "require": "./dist/date.cjs"
+    },
+    "./logger": {
+      "import": "./dist/logger.js",
+      "require": "./dist/logger.cjs"
+    },
+    "./string": {
+      "import": "./dist/string.js",
+      "require": "./dist/string.cjs"
+    }
+  },
   "scripts": {
-    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
+    "build": "node build.js",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
+    "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/quietwaters/utils.git"
   },
-  "author": "",
-  "license": "MIT",
+  "homepage": "https://github.com/quietwaters/utils#readme",
   "bugs": {
     "url": "https://github.com/quietwaters/utils/issues"
   },
-  "homepage": "https://github.com/quietwaters/utils#readme",
-  "description": "",
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.8.0"
+  },
   "devDependencies": {
     "@eslint/js": "^9.36.0",
+    "esbuild": "^0.25.10",
     "eslint": "^9.36.0",
     "globals": "^16.4.0",
     "jest": "^30.1.3"
-  },
-  "dependencies": {
-
   }
 }
