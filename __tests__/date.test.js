@@ -56,4 +56,34 @@ describe('formatTime', () => {
     expect(formatTime(newYear)).toBe('2024-01-01 00:00');
     expect(formatTime(endYear)).toBe('2023-12-31 23:59');
   });
+
+  test('formats date with different timezones', () => {
+    const date = new Date('2023-05-15T14:30:25.000Z');
+
+    // UTC (default)
+    expect(formatTime(date)).toBe('2023-05-15 14:30');
+    expect(formatTime(date, { timezone: 'UTC' })).toBe('2023-05-15 14:30');
+
+    // Different timezones
+    expect(formatTime(date, { timezone: 'America/New_York' })).toBe('2023-05-15 10:30');
+    expect(formatTime(date, { timezone: 'Asia/Shanghai' })).toBe('2023-05-15 22:30');
+    expect(formatTime(date, { timezone: 'Europe/London' })).toBe('2023-05-15 15:30');
+  });
+
+  test('formats date without time in different timezones', () => {
+    const date = new Date('2023-05-15T14:30:25.000Z');
+
+    expect(formatTime(date, { includeTime: false, timezone: 'UTC' })).toBe('2023-05-15');
+    expect(formatTime(date, { includeTime: false, timezone: 'America/New_York' })).toBe('2023-05-15');
+    expect(formatTime(date, { includeTime: false, timezone: 'Asia/Shanghai' })).toBe('2023-05-15');
+  });
+
+  test('handles timezone date boundary correctly', () => {
+    // This UTC time is late in the day, which may cross to next day in some timezones
+    const date = new Date('2023-05-15T23:30:00.000Z');
+
+    expect(formatTime(date, { timezone: 'UTC' })).toBe('2023-05-15 23:30');
+    expect(formatTime(date, { timezone: 'Asia/Tokyo' })).toBe('2023-05-16 08:30');
+    expect(formatTime(date, { timezone: 'America/Los_Angeles' })).toBe('2023-05-15 16:30');
+  });
 });
