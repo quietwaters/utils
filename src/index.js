@@ -172,8 +172,85 @@ export function toBoolean(value) {
 //   return base.slice(0, maxLength);
 // }
 
-function isNil(val){
+export function isNil(val){
   return val === undefined || val === null;
+}
+
+export function readEnv(envParams, envValues){
+  const result = {};
+  const invalidEnvs = [];
+
+  Object.keys(envParams).forEach((envName) => {
+    const originalValue = envValues[envName];
+    let parsedValue;
+
+    const envDef = envParams[envName];
+
+    if(isNil(originalValue)){
+      parsedValue = envDef.defaultValue;
+    } else {
+      switch(envDef.type){
+        case String:
+          parsedValue = String(originalValue);
+          break;
+        case Number:
+          parsedValue = Number(originalValue);
+          break;
+        case Boolean:
+          parsedValue = toBoolean(originalValue);
+          break;
+        default:
+          parsedValue = envDef.func && envDef.func(originalValue);
+          break;
+      }
+    }
+
+    if(envDef.required && (isNil(parsedValue) || (envDef.type === Number && isNaN(parsedValue)))){
+      invalidEnvs.push({name: envName, value: parsedValue});
+    } else {
+      result[envName] = parsedValue;
+    }
+  });
+
+  if(invalidEnvs.length > 0){
+    throw new Error('invalid env', {cause: invalidEnvs});
+  }
+
+  return result;
+}
+
+export function formatTime(input, { includeTime = true, timezone = 'UTC' } = {}) {
+  const date = input instanceof Date ? input : new Date(input);
+  if (Number.isNaN(date.getTime())) return '';
+
+  if (timezone === 'UTC') {
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(date.getUTCDate()).padStart(2, '0');
+    if (!includeTime) return `${y}-${m}-${d}`;
+    const hh = String(date.getUTCHours()).padStart(2, '0');
+    const mm = String(date.getUTCMinutes()).padStart(2, '0');
+    return `${y}-${m}-${d} ${hh}:${mm}`;
+  }
+
+  // Use Intl.DateTimeFormat for other timezones
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: includeTime ? '2-digit' : undefined,
+    minute: includeTime ? '2-digit' : undefined,
+    hour12: false
+  });
+
+  const parts = formatter.formatToParts(date);
+  const datePart = `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}`;
+
+  if (!includeTime) return datePart;
+
+  const timePart = `${parts.find(p => p.type === 'hour').value}:${parts.find(p => p.type === 'minute').value}`;
+  return `${datePart} ${timePart}`;
 }
 
 export default {
@@ -190,4 +267,6 @@ export default {
   maskString,
   toBoolean,
   isNil,
+  readEnv,
+  formatTime,
 };

@@ -11,7 +11,11 @@ import {
   withTimeout,
   withRetry,
   startTimer,
-  maskString
+  maskString,
+  toBoolean,
+  isNil,
+  readEnv,
+  formatTime
 } from '../src/index.js';
 
 afterEach(() => {
@@ -148,6 +152,113 @@ test('maskString masks 80% of string length with max 4 chars at head/tail', () =
   // Reveal option
   expect(maskString('secret', { reveal: true })).toBe('secret');
   expect(maskString('secret', { reveal: false })).toBe('s*****'); // 6 chars: 80% = 5 masked, 1 kept
+});
+
+test('toBoolean converts various values to boolean', () => {
+  // Truthy values
+  expect(toBoolean(true)).toBe(true);
+  expect(toBoolean('true')).toBe(true);
+  expect(toBoolean('TRUE')).toBe(true);
+  expect(toBoolean('1')).toBe(true);
+  expect(toBoolean('yes')).toBe(true);
+  expect(toBoolean('y')).toBe(true);
+  expect(toBoolean('on')).toBe(true);
+  expect(toBoolean(' YES ')).toBe(true);
+
+  // Falsy values
+  expect(toBoolean(false)).toBe(false);
+  expect(toBoolean('false')).toBe(false);
+  expect(toBoolean('FALSE')).toBe(false);
+  expect(toBoolean('0')).toBe(false);
+  expect(toBoolean('no')).toBe(false);
+  expect(toBoolean('n')).toBe(false);
+  expect(toBoolean('off')).toBe(false);
+  expect(toBoolean(' NO ')).toBe(false);
+
+  // Edge cases
+  expect(toBoolean(undefined)).toBe(false);
+  expect(toBoolean(null)).toBe(false);
+  expect(toBoolean('')).toBe(false);
+  expect(toBoolean('   ')).toBe(false);
+  expect(toBoolean('invalid')).toBe(false);
+  expect(toBoolean(123)).toBe(false);
+});
+
+test('isNil checks for null or undefined', () => {
+  expect(isNil(null)).toBe(true);
+  expect(isNil(undefined)).toBe(true);
+  expect(isNil(false)).toBe(false);
+  expect(isNil(0)).toBe(false);
+  expect(isNil('')).toBe(false);
+  expect(isNil([])).toBe(false);
+  expect(isNil({})).toBe(false);
+});
+
+test('readEnv parses environment variables with validation', () => {
+  const envParams = {
+    PORT: { type: Number, required: true },
+    DEBUG: { type: Boolean, defaultValue: false },
+    API_KEY: { type: String, required: true },
+    OPTIONAL: { type: String, defaultValue: 'default' }
+  };
+
+  const envValues = {
+    PORT: '3000',
+    DEBUG: 'true',
+    API_KEY: 'secret123'
+  };
+
+  const result = readEnv(envParams, envValues);
+  expect(result).toEqual({
+    PORT: 3000,
+    DEBUG: true,
+    API_KEY: 'secret123',
+    OPTIONAL: 'default'
+  });
+});
+
+test('readEnv throws error for missing required values', () => {
+  const envParams = {
+    REQUIRED_VAR: { type: String, required: true }
+  };
+  const envValues = {};
+
+  expect(() => readEnv(envParams, envValues)).toThrow('invalid env');
+});
+
+test('readEnv handles custom function types', () => {
+  const envParams = {
+    CUSTOM: {
+      func: (val) => val.split(','),
+      required: false,
+      defaultValue: []
+    }
+  };
+  const envValues = {
+    CUSTOM: 'a,b,c'
+  };
+
+  const result = readEnv(envParams, envValues);
+  expect(result.CUSTOM).toEqual(['a', 'b', 'c']);
+});
+
+test('formatTime formats dates with various options', () => {
+  const testDate = new Date('2023-05-15T14:30:25.123Z');
+
+  // UTC formatting
+  expect(formatTime(testDate)).toBe('2023-05-15 14:30');
+  expect(formatTime(testDate, { includeTime: false })).toBe('2023-05-15');
+  expect(formatTime(testDate, { includeTime: true, timezone: 'UTC' })).toBe('2023-05-15 14:30');
+
+  // Test with timestamp
+  expect(formatTime(testDate.getTime())).toBe('2023-05-15 14:30');
+
+  // Test timezone (using a common timezone)
+  expect(formatTime(testDate, { timezone: 'America/New_York' })).toMatch(/^2023-05-15 \d{2}:\d{2}$/);
+
+  // Invalid date
+  expect(formatTime('invalid')).toBe('');
+  expect(formatTime(new Date('invalid'))).toBe('');
 });
 
 

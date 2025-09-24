@@ -10,17 +10,9 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
-    "./date": {
-      "import": "./dist/date.js",
-      "require": "./dist/date.cjs"
-    },
-    "./logger": {
-      "import": "./dist/logger.js",
-      "require": "./dist/logger.cjs"
-    },
-    "./string": {
-      "import": "./dist/string.js",
-      "require": "./dist/string.cjs"
+    "./constants": {
+      "import": "./dist/constants.js",
+      "require": "./dist/constants.cjs"
     }
   },
   "scripts": {
