@@ -13,7 +13,7 @@ export default defineConfig([
     }
   },
   {
-    files: ["test/**/*.test.js"],
+    files: ["__tests__/**/*.test.js"],
     languageOptions: {
       globals: {
         ...globals.node,

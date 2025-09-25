@@ -1,39 +1,45 @@
 import crypto from 'node:crypto';
+import winston from 'winston';
 
-// ---- Response helpers ----------------------------------------------------
-export function makeSuccess(data = null, options = {}) {
-  const { includeErrorField = false } = options;
-  const payload = { success: true, data };
-  if (includeErrorField) {
-    payload.error = null;
+/**
+ * Standard success response
+ * @param {any} data - The data to include in the success response
+ * @return {Object}
+ */
+export function makeSuccess(data) {
+  return { success: true, data };
+}
+
+/**
+ * @param {string|number} code - Error code (for programme read)
+ * @param {string} message - Error message (for human read)
+ * @param {any} [data=null] - Additional error data
+ * @return {Object}
+ */
+export function makeError(code, message, data) {
+  const result = {success: false};
+
+  if(!isNil(code)){
+    if(!result.error){
+      result.error = {};
+    }
+    result.error.code = code;
   }
-  return payload;
-}
 
-export function makeError(code, message, data = null) {
-  return { success: false, error: { code, message }, data };
-}
-
-// ---- Identifier helpers --------------------------------------------------
-export function generateRequestId(prefix = 'req') {
-  const safePrefix = typeof prefix === 'string' && prefix.trim() ? prefix.trim() : 'req';
-  const timestamp = Date.now().toString(16);
-  const randomPart = Math.random().toString(16).slice(2, 10);
-  return `${safePrefix}_${timestamp}_${randomPart}`;
-}
-
-export function createTimeId() {
-  const ts = Date.now().toString(16);
-  let rand = '';
-  try {
-    rand = crypto.randomBytes(6).toString('hex');
-  } catch (_) {
-    rand = Math.random().toString(16).slice(2, 14);
+  if(!isNil(message)){
+    if(!result.error){
+      result.error = {};
+    }
+    result.error.message = message;
   }
-  return `${ts}-${rand}`;
+
+  if(!isNil(data)){
+    result.data = data;
+  }
+
+  return result;
 }
 
-// ---- Timing helpers ------------------------------------------------------
 export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -41,6 +47,18 @@ export function sleep(ms) {
 export function defaultBackoff(attempt) {
   const base = 2000 * Math.pow(2, attempt);
   return Math.min(base, 8000);
+}
+
+export function generateId(prefix = '') {
+  const ts = Date.now().toString(16);
+  let rand = '';
+  try {
+    rand = crypto.randomBytes(6).toString('hex');
+  } catch (_) {
+    rand = Math.random().toString(16).slice(2, 14);
+  }
+
+  return `${prefix}${ts}-${rand}`;
 }
 
 export function isRetryableError(err) {
@@ -54,13 +72,13 @@ export function isRetryableError(err) {
   return name === 'AbortError' || code === 'ECONNRESET' || code === 'ETIMEDOUT';
 }
 
-export async function withTimeout(promiseOrFn, timeoutMs) {
+export async function withTimeout(promiseOrFn, timeoutMs, errorMessage) {
   const promise = typeof promiseOrFn === 'function' ? promiseOrFn() : promiseOrFn;
   if (!timeoutMs || timeoutMs <= 0) return promise;
   let timer;
   const timeoutPromise = new Promise((_, reject) => {
     timer = setTimeout(() => {
-      const error = new Error('Operation timed out');
+      const error = new Error(errorMessage || 'Operation timed out');
       error.code = 'ETIMEDOUT';
       reject(error);
     }, timeoutMs);
@@ -99,48 +117,64 @@ export function startTimer() {
   };
 }
 
-export function maskString(str, { reveal = false } = {}) {
-  const text = typeof str === 'string' ? str : '';
-  if (!text) return '';
-  if (reveal) return text;
+export function maskString(str) {
+  if(isNil(str)){
+    return '';
+  }
 
-  const totalLen = text.length;
-  if (totalLen <= 2) return '*'.repeat(totalLen);
+  str = str.toString();
 
-  // Calculate 80% mask length
-  const maskLen = Math.ceil(totalLen * 0.8);
-  const keepLen = totalLen - maskLen;
+  if(str == ''){
+    return str;
+  }
 
-  // Split keep length between head and tail, max 4 each
-  const headLen = Math.min(4, Math.ceil(keepLen / 2));
-  const tailLen = Math.min(4, keepLen - headLen);
+  const maskPercentage = 0.7;
+  const maxShownLength = 10;
 
-  const head = text.slice(0, headLen);
-  const tail = tailLen > 0 ? text.slice(-tailLen) : '';
-  const actualMaskLen = totalLen - headLen - tailLen;
+  const len = str.length;
 
-  return `${head}${'*'.repeat(actualMaskLen)}${tail}`;
+  // For very short strings, ensure at least some characters are shown
+  let shownLength = Math.max(1, Math.floor(len * (1 - maskPercentage)));
+
+  // Apply maximum shown length limit
+  if(shownLength > maxShownLength){
+    shownLength = maxShownLength;
+  }
+
+  // For single character, mask completely
+  if(len === 1) {
+    return '*';
+  }
+
+  // Ensure we don't show more characters than the string length
+  if(shownLength >= len) {
+    shownLength = Math.max(1, len - 1);
+  }
+
+  let leftLength, rightLength;
+  if(shownLength % 2 === 0){
+    leftLength = shownLength / 2;
+    rightLength = leftLength;
+  } else {
+    // When odd number of shown chars, show more on the right
+    leftLength = Math.floor(shownLength / 2);
+    rightLength = shownLength - leftLength;
+  }
+
+  // Handle edge case where rightLength would be 0
+  if(rightLength === 0 && len > 1) {
+    rightLength = 1;
+    leftLength = Math.max(0, shownLength - rightLength);
+  }
+
+  const maskedLength = len - shownLength;
+  return `${str.slice(0, leftLength)}${'*'.repeat(maskedLength)}${str.slice(-rightLength)}`;
 }
-
-// ---- String helpers ------------------------------------------------------
-// export function normalizeString(value, { fallback = '', trim = true, maxLength = 5000 } = {}) {
-//   if (value === undefined || value === null) return fallback;
-//   if (typeof value !== 'string') return fallback;
-//   const text = trim ? value.trim() : value;
-//   if (!text) return fallback;
-//   if (maxLength && text.length > maxLength) {
-//     return text.slice(0, maxLength);
-//   }
-//   return text;
-// }
-
-// export function safeString(value, fallback = '') {
-//   return typeof value === 'string' ? value : fallback;
-// }
 
 export function toBoolean(value) {
   if (value === undefined || value === null) return false;
   if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return value !== 0;
 
   const normalized = String(value).trim().toLowerCase();
   if (!normalized) return false;
@@ -149,28 +183,6 @@ export function toBoolean(value) {
   if (['0', 'false', 'no', 'n', 'off'].includes(normalized)) return false;
   return false;
 }
-
-// ---- Numeric helpers -----------------------------------------------------
-// export function toNumber(value, fallback = undefined) {
-//   const n = Number(value);
-//   return Number.isFinite(n) ? n : fallback;
-// }
-
-// export function toInt(value, fallback = undefined) {
-//   const n = Number(value);
-//   return Number.isInteger(n) ? n : fallback;
-// }
-
-// export function compactWhitespace(text, { trim = true } = {}) {
-//   const normalized = typeof text === 'string' ? text.replace(/\s+/g, ' ') : '';
-//   return trim ? normalized.trim() : normalized;
-// }
-
-// export function createPreview(text, { maxLength = 120, trim = true } = {}) {
-//   const base = compactWhitespace(text, { trim });
-//   if (!maxLength || maxLength < 0) return base;
-//   return base.slice(0, maxLength);
-// }
 
 export function isNil(val){
   return val === undefined || val === null;
@@ -190,9 +202,6 @@ export function readEnv(envParams, envValues){
       parsedValue = envDef.defaultValue;
     } else {
       switch(envDef.type){
-        case String:
-          parsedValue = String(originalValue);
-          break;
         case Number:
           parsedValue = Number(originalValue);
           break;
@@ -200,12 +209,12 @@ export function readEnv(envParams, envValues){
           parsedValue = toBoolean(originalValue);
           break;
         default:
-          parsedValue = envDef.func && envDef.func(originalValue);
+          parsedValue = String(originalValue);
           break;
       }
     }
 
-    if(envDef.required && (isNil(parsedValue) || (envDef.type === Number && isNaN(parsedValue)))){
+    if(envDef.required && (isNil(parsedValue) || (envDef.type === Number && isNaN(parsedValue)) || parsedValue === '')){
       invalidEnvs.push({name: envName, value: parsedValue});
     } else {
       result[envName] = parsedValue;
@@ -219,54 +228,91 @@ export function readEnv(envParams, envValues){
   return result;
 }
 
-export function formatTime(input, { includeTime = true, timezone = 'UTC' } = {}) {
-  const date = input instanceof Date ? input : new Date(input);
-  if (Number.isNaN(date.getTime())) return '';
+/**
+ * Log utility that wraps winston for consistent logging
+ * Assumes winston is available in the consuming project
+ */
 
-  if (timezone === 'UTC') {
-    const y = date.getUTCFullYear();
-    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const d = String(date.getUTCDate()).padStart(2, '0');
-    if (!includeTime) return `${y}-${m}-${d}`;
-    const hh = String(date.getUTCHours()).padStart(2, '0');
-    const mm = String(date.getUTCMinutes()).padStart(2, '0');
-    return `${y}-${m}-${d} ${hh}:${mm}`;
-  }
+let rootLogger;
 
-  // Use Intl.DateTimeFormat for other timezones
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: includeTime ? '2-digit' : undefined,
-    minute: includeTime ? '2-digit' : undefined,
-    hour12: false
+// Create root logger with default configuration
+function createRootLogger() {
+  return winston.createLogger({
+    level: 'info',
+    format: winston.format.combine(
+      winston.format.timestamp({ format: () => new Date().toISOString() }),
+      winston.format.printf(({ timestamp, level, message, ...meta }) => {
+        // Extract context fields (those set via getLogger)
+        const contextFields = [];
+        const remainingMeta = {};
+
+        // Separate context fields from other meta
+        for (const [key, value] of Object.entries(meta)) {
+          if (value !== undefined && value !== null) {
+            contextFields.push(value);
+          } else {
+            remainingMeta[key] = value;
+          }
+        }
+
+        const contextStr = contextFields.length ? contextFields.join(' ') : 'N/A';
+        const metaStr = Object.keys(remainingMeta).length ? ` ${JSON.stringify(remainingMeta)}` : '';
+
+        return `${timestamp} ${level.toUpperCase()} ${contextStr} ${message}${metaStr}`;
+      })
+    ),
+    transports: [
+      new winston.transports.Console()
+    ]
   });
-
-  const parts = formatter.formatToParts(date);
-  const datePart = `${parts.find(p => p.type === 'year').value}-${parts.find(p => p.type === 'month').value}-${parts.find(p => p.type === 'day').value}`;
-
-  if (!includeTime) return datePart;
-
-  const timePart = `${parts.find(p => p.type === 'hour').value}:${parts.find(p => p.type === 'minute').value}`;
-  return `${datePart} ${timePart}`;
 }
 
+export const log = {
+  set level(level) {
+    if (!rootLogger) {
+      rootLogger = createRootLogger();
+    }
+    rootLogger.level = level;
+  },
+
+  get level() {
+    if (!rootLogger) {
+      rootLogger = createRootLogger();
+    }
+    return rootLogger.level;
+  },
+
+  getLogger(options = {}) {
+    if (!rootLogger) {
+      rootLogger = createRootLogger();
+    }
+
+    return rootLogger.child(options);
+  }
+};
+
 export default {
+  // response
   makeSuccess,
   makeError,
-  generateRequestId,
-  createTimeId,
+
+  // util
+  generateId,
   sleep,
-  defaultBackoff,
-  isRetryableError,
-  withTimeout,
-  withRetry,
   startTimer,
   maskString,
   toBoolean,
   isNil,
+
+  // retry and timeout handling
+  defaultBackoff,
+  isRetryableError,
+  withTimeout,
+  withRetry,
+
+  // env
   readEnv,
-  formatTime,
+
+  // logging
+  log,
 };
