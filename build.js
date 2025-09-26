@@ -1,43 +1,63 @@
-import { build } from 'esbuild'
-import { readdir } from 'fs/promises'
-import { join } from 'path'
+import { build } from 'esbuild';
+import { readdir } from 'fs/promises';
+import { join } from 'path';
+
+async function getEntryPoints(dir) {
+  const entries = await readdir(dir, { withFileTypes: true });
+  const files = [];
+
+  for (const entry of entries) {
+    const fullPath = join(dir, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...await getEntryPoints(fullPath));
+    } else if (entry.isFile() && entry.name.endsWith('.js')) {
+      files.push(fullPath);
+    }
+  }
+
+  return files;
+}
 
 async function buildAll() {
   try {
-    // Get all JS files in src directory
-    const srcFiles = await readdir('src')
-    const jsFiles = srcFiles
-      .filter(file => file.endsWith('.js'))
-      .map(file => `src/${file}`)
+    const entryPoints = await getEntryPoints('src');
 
-    console.log('Building files:', jsFiles)
+    if (entryPoints.length === 0) {
+      console.warn('No entry points found in src directory.');
+      return;
+    }
 
-    // Build ESM version
-    await build({
-      entryPoints: jsFiles,
+    console.log('Building files:', entryPoints);
+
+    const sharedOptions = {
+      entryPoints,
       outdir: 'dist',
+      outbase: 'src',
+      platform: 'node',
+      target: 'node14.8',
+      bundle: false,
+      splitting: false,
+      treeShaking: true,
+      logLevel: 'info',
+    };
+
+    await build({
+      ...sharedOptions,
       format: 'esm',
       outExtension: { '.js': '.js' },
-      platform: 'node',
-      target: 'node14.8'
-    })
-    console.log('✅ ESM build complete')
+    });
+    console.log('✅ ESM build complete');
 
-    // Build CommonJS version
     await build({
-      entryPoints: jsFiles,
-      outdir: 'dist',
+      ...sharedOptions,
       format: 'cjs',
       outExtension: { '.js': '.cjs' },
-      platform: 'node',
-      target: 'node14.8'
-    })
-    console.log('✅ CommonJS build complete')
-
+    });
+    console.log('✅ CommonJS build complete');
   } catch (error) {
-    console.error('❌ Build failed:', error)
-    process.exit(1)
+    console.error('❌ Build failed:', error);
+    process.exit(1);
   }
 }
 
-buildAll()
+buildAll();
