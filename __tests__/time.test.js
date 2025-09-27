@@ -1,8 +1,7 @@
-import { jest } from '@jest/globals';
-import {
+const {
   sleep,
   startTimer,
-} from '../src/time';
+} = require('../src/time');
 
 afterEach(() => {
   jest.restoreAllMocks();

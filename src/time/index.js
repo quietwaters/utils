@@ -11,7 +11,7 @@ function startTimer() {
   };
 }
 
-export {
+module.exports = {
   sleep,
-  startTimer,
-}
+  startTimer
+};

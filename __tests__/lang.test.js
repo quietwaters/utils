@@ -1,8 +1,7 @@
-import { jest } from '@jest/globals';
-import {
+const {
   toBoolean,
   isNil,
-} from '../src/lang';
+} = require('../src/lang');
 
 afterEach(() => {
   jest.restoreAllMocks();

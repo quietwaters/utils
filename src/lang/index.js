@@ -15,7 +15,7 @@ function toBoolean(value) {
   return false;
 }
 
-export {
+module.exports = {
   isNil,
   toBoolean
-}
+};

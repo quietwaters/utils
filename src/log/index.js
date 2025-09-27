@@ -1,4 +1,4 @@
-import winston from 'winston';
+const winston = require('winston');
 
 /**
  * Log utility that wraps winston for consistent logging
@@ -63,6 +63,6 @@ const log = {
   }
 };
 
-export {
+module.exports = {
   log
 };

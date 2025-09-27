@@ -1,4 +1,4 @@
-import { sleep } from '../time';
+const { sleep } = require('../time');
 
 function defaultBackoff(attempt) {
   const base = 2000 * Math.pow(2, attempt);
@@ -52,9 +52,9 @@ async function withRetry(fn, { maxRetries = 0, isRetryable = isRetryableError, b
   throw lastError;
 }
 
-export {
+module.exports = {
   defaultBackoff,
   isRetryableError,
   withTimeout,
-  withRetry,
-}
+  withRetry
+};

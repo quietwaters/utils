@@ -1,4 +1,4 @@
-import { isNil, toBoolean } from '../lang/index.js';
+const { isNil, toBoolean } = require('../lang/index.js');
 
 function readEnv(envParams, envValues){
   const result = {};
@@ -40,6 +40,6 @@ function readEnv(envParams, envValues){
   return result;
 }
 
-export {
+module.exports = {
   readEnv
-}
+};

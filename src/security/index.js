@@ -1,4 +1,4 @@
-import {isNil} from '../lang';
+const {isNil} = require('../lang');
 
 function maskString(str) {
   if (isNil(str)) {
@@ -55,6 +55,6 @@ function maskString(str) {
   return `${str.slice(0, leftLength)}${'*'.repeat(maskedLength)}${str.slice(-rightLength)}`;
 }
 
-export {
-  maskString,
+module.exports = {
+  maskString
 };

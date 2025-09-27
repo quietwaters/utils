@@ -1,10 +1,9 @@
-import { jest } from '@jest/globals';
-import {
+const {
   defaultBackoff,
   isRetryableError,
   withTimeout,
   withRetry,
-} from '../src/flowcontrol';
+} = require('../src/flowcontrol');
 
 afterEach(() => {
   jest.restoreAllMocks();

@@ -1,7 +1,6 @@
-import { jest } from '@jest/globals';
-import {
+const {
   maskString,
-} from '../src/security';
+} = require('../src/security');
 
 afterEach(() => {
   jest.restoreAllMocks();

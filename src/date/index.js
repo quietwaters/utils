@@ -14,7 +14,7 @@ function toDate(value) {
   throw new TypeError('Invalid date value');
 }
 
-export function formatTime(value, { locale = 'en-US', timeZone, hour12 } = {}) {
+function formatTime(value, { locale = 'en-US', timeZone, hour12 } = {}) {
   const date = toDate(value);
   const formatter = new Intl.DateTimeFormat(locale, {
     ...DEFAULT_TIME_OPTIONS,
@@ -24,7 +24,7 @@ export function formatTime(value, { locale = 'en-US', timeZone, hour12 } = {}) {
   return formatter.format(date);
 }
 
-export function formatDate(value, { locale = 'en-US', timeZone } = {}) {
+function formatDate(value, { locale = 'en-US', timeZone } = {}) {
   const date = toDate(value);
   const formatter = new Intl.DateTimeFormat(locale, {
     ...DEFAULT_DATE_OPTIONS,
@@ -33,7 +33,7 @@ export function formatDate(value, { locale = 'en-US', timeZone } = {}) {
   return formatter.format(date);
 }
 
-export function formatDateTime(value, { locale = 'en-US', timeZone, hour12 } = {}) {
+function formatDateTime(value, { locale = 'en-US', timeZone, hour12 } = {}) {
   const date = toDate(value);
   const formatter = new Intl.DateTimeFormat(locale, {
     ...DEFAULT_DATE_OPTIONS,
@@ -43,3 +43,9 @@ export function formatDateTime(value, { locale = 'en-US', timeZone, hour12 } = {
   });
   return formatter.format(date);
 }
+
+module.exports = {
+  formatTime,
+  formatDate,
+  formatDateTime
+};

@@ -1,4 +1,4 @@
-import crypto from 'node:crypto';
+const crypto = require('crypto');
 
 function generateId(prefix = '') {
   const ts = Date.now().toString(16);
@@ -12,6 +12,6 @@ function generateId(prefix = '') {
   return `${prefix}${ts}-${rand}`;
 }
 
-export {
+module.exports = {
   generateId
 };

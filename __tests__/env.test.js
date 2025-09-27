@@ -1,7 +1,6 @@
-import { jest } from '@jest/globals';
-import {
+const {
   readEnv,
-} from '../src/env';
+} = require('../src/env');
 
 afterEach(() => {
   jest.restoreAllMocks();

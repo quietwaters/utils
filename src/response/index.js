@@ -1,11 +1,11 @@
-import {isNil} from '../lang/index.js';
+const {isNil} = require('../lang/index.js');
 
 /**
  * Standard success response
  * @param {any} data - The data to include in the success response
  * @return {Object}
  */
-export function makeSuccess(data) {
+function makeSuccess(data) {
   return { success: true, data };
 }
 
@@ -15,7 +15,7 @@ export function makeSuccess(data) {
  * @param {any} [data=null] - Additional error data
  * @return {Object}
  */
-export function makeError(code, message, data) {
+function makeError(code, message, data) {
   const result = {success: false};
 
   if(!isNil(code)){
@@ -38,3 +38,8 @@ export function makeError(code, message, data) {
 
   return result;
 }
+
+module.exports = {
+  makeSuccess,
+  makeError
+};

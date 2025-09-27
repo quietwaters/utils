@@ -1,8 +1,7 @@
-import { jest } from '@jest/globals';
-import {
+const {
   makeSuccess,
   makeError,
-} from '../src/response';
+} = require('../src/response');
 
 afterEach(() => {
   jest.restoreAllMocks();

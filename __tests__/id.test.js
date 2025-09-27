@@ -1,8 +1,7 @@
-import { jest } from '@jest/globals';
-import crypto from 'node:crypto';
-import {
+const crypto = require('crypto');
+const {
   generateId,
-} from '../src/id';
+} = require('../src/id');
 
 afterEach(() => {
   jest.restoreAllMocks();
