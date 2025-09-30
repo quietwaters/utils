@@ -3,10 +3,12 @@ const {generateId} = require('../../id');
 const {log} = require('../../log');
 const {ERROR_CODE} = require('../../constants');
 
-function entranceWrapper(cloud){
+function entranceWrapper(cloud, options = {}, functionEntrance){
   log.level = process.env.LOG_LEVEL || 'info';
 
-  const functionEntrance = require('./entrance');
+  if (!functionEntrance) {
+    throw new Error('entrance is required');
+  }
 
   return async (event) => {
     const { OPENID } = cloud.getWXContext();
