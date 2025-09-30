@@ -37,4 +37,4 @@ function entranceWrapper(cloud, cloudFunctionName){
   }
 }
 
-module.exports = entranceWrapper;
+module.exports = {entranceWrapper};

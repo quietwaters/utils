@@ -213,4 +213,4 @@ const createCollection = (cloud, collectionName) => {
 };
 
 // CommonJS export
-module.exports = createCollection;
+module.exports = {createCollection};

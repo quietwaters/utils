@@ -14,6 +14,9 @@
     "./log": "./src/log/index.js",
     "./response": "./src/response/index.js",
     "./security": "./src/security/index.js",
+    "./tencentcloud": "./src/tencentcloud/index.js",
+    "./tencentcloud/cloudfunction": "./src/tencentcloud/cloudfunction/index.js",
+    "./tencentcloud/documentdb": "./src/tencentcloud/documentdb/index.js",
     "./time": "./src/time/index.js"
   },
   "scripts": {
