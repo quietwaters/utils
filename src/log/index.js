@@ -15,22 +15,19 @@ function createRootLogger() {
       winston.format.timestamp({ format: () => new Date().toISOString() }),
       winston.format.printf(({ timestamp, level, message, ...meta }) => {
         // Extract context fields (those set via getLogger)
-        const contextFields = [];
-        const remainingMeta = {};
+        const contextParts = [];
 
-        // Separate context fields from other meta
+        // Build context string with key: value format
         for (const [key, value] of Object.entries(meta)) {
-          if (value !== undefined && value !== null) {
-            contextFields.push(value);
-          } else {
-            remainingMeta[key] = value;
+          if (value !== undefined && value !== null && key !== 'splat') {
+            contextParts.push(`${key}: ${value}`);
           }
         }
 
-        const contextStr = contextFields.length ? contextFields.join(' ') : 'N/A';
-        const metaStr = Object.keys(remainingMeta).length ? ` ${JSON.stringify(remainingMeta)}` : '';
+        const contextStr = contextParts.length ? contextParts.join(' ') : '';
+        const separator = contextStr ? ' - ' : '';
 
-        return `${timestamp} ${level.toUpperCase()} ${contextStr} ${message}${metaStr}`;
+        return `${timestamp} [${level.toUpperCase()}] ${contextStr}${separator}${message}`;
       })
     ),
     transports: [
