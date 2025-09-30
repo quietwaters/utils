@@ -11,7 +11,7 @@ function makeSuccess(data) {
 
 /**
  * @param {string|number} code - Error code (for programme read)
- * @param {string} message - Error message (for human read)
+ * @param {string|Error} message - Error message (for human read) or Error object
  * @param {any} [data=null] - Additional error data
  * @return {Object}
  */
@@ -29,7 +29,13 @@ function makeError(code, message, data) {
     if(!result.error){
       result.error = {};
     }
-    result.error.message = message;
+
+    // Handle Error objects - extract only the message, not the stack
+    if(message instanceof Error){
+      result.error.message = message.message || 'An error occurred';
+    } else {
+      result.error.message = String(message);
+    }
   }
 
   if(!isNil(data)){

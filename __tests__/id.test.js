@@ -18,19 +18,14 @@ describe('test generateId', () => {
     expect(generateId()).toBe(`${(1700000000000).toString(16)}-aabbccddeeff`);
   });
 
-  test('createTimeId falls back to Math.random', () => {
-    const dateSpy = jest.spyOn(Date, 'now');
+  test('generateId throws error when crypto.randomBytes fails', () => {
     const randomBytesSpy = jest.spyOn(crypto, 'randomBytes');
-    const mathRandomSpy = jest.spyOn(Math, 'random');
 
-    dateSpy.mockReturnValue(42);
     randomBytesSpy.mockImplementation(() => {
       throw new Error('no entropy');
     });
-    mathRandomSpy.mockReturnValue(0.123456789);
 
-    const fallbackId = generateId();
-    expect(fallbackId).toEqual('2a-1f9add373963');
+    expect(() => generateId()).toThrow('no entropy');
   });
 
   test('generateId with prefix', () => {

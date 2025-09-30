@@ -129,6 +129,7 @@ describe('test withTimeout', () => {
 
   test('withTimeout with very large timeout values', async () => {
     const fastPromise = Promise.resolve('quick');
+    // Test with Number.MAX_SAFE_INTEGER - should be clamped internally
     await expect(withTimeout(fastPromise, Number.MAX_SAFE_INTEGER)).resolves.toBe('quick');
   });
 

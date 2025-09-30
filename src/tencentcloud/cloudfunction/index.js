@@ -3,10 +3,10 @@ const {generateId} = require('../../id');
 const {log} = require('../../log');
 const {ERROR_CODE} = require('../../constants');
 
-function entranceWrapper(cloud, cloudFunctionName){
+function entranceWrapper(cloud){
   log.level = process.env.LOG_LEVEL || 'info';
 
-  const functionEntrance = require('./' + cloudFunctionName);
+  const functionEntrance = require('./entrance');
 
   return async (event) => {
     const { OPENID } = cloud.getWXContext();
@@ -16,10 +16,10 @@ function entranceWrapper(cloud, cloudFunctionName){
       openId: OPENID
     });
 
-    logger.debug(`running cloud function: ${cloudFunctionName}, with params ${Object.keys(event || {})}`);
+    logger.debug(`running cloud function with params ${Object.keys(event || {})}`);
 
     try{
-      logger.debug(`ready to call function entrance ${cloudFunctionName}`);
+      logger.debug(`ready to call function entrance`);
 
       const result = await functionEntrance(event, {
         cloud,
@@ -28,11 +28,16 @@ function entranceWrapper(cloud, cloudFunctionName){
         processEnv: process.env
       });
 
-      logger.debug(`call function entrance ${cloudFunctionName} done`);
+      logger.debug(`call function entrance done`);
       return makeSuccess(result);
     } catch(e){
-      logger.error(`call function entrance ${cloudFunctionName} error: ${e}`);
-      return makeError(ERROR_CODE.SERVER_ERROR, `${e}` || 'server error');
+      // Log full error details (including stack) for debugging
+      logger.error(`call function entrance error: ${e.message}`, {
+        stack: e.stack,
+        code: e.code
+      });
+      // Return only safe error message to client (no stack trace)
+      return makeError(ERROR_CODE.SERVER_ERROR, e);
     }
   }
 }

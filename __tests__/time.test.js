@@ -21,6 +21,7 @@ describe('test sleep', () => {
   });
 
   test('sleep with negative value resolves immediately', async () => {
+    // Negative values are clamped to 0 internally
     const start = Date.now();
     await sleep(-100);
     const elapsed = Date.now() - start;

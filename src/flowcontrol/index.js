@@ -19,13 +19,18 @@ function isRetryableError(err) {
 async function withTimeout(promiseOrFn, timeoutMs, errorMessage) {
   const promise = typeof promiseOrFn === 'function' ? promiseOrFn() : promiseOrFn;
   if (!timeoutMs || timeoutMs <= 0) return promise;
+
+  // Clamp timeout to valid range to avoid Node.js warnings
+  // setTimeout accepts 1 to 2147483647 (2^31-1) ms
+  const clampedTimeout = Math.min(timeoutMs, 2147483647);
+
   let timer;
   const timeoutPromise = new Promise((_, reject) => {
     timer = setTimeout(() => {
       const error = new Error(errorMessage || 'Operation timed out');
       error.code = 'ETIMEDOUT';
       reject(error);
-    }, timeoutMs);
+    }, clampedTimeout);
   });
   try {
     return await Promise.race([promise, timeoutPromise]);

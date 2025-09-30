@@ -36,9 +36,11 @@ const handleDbResult = (result, operation) => {
  * Create collection operation object
  * @param {Object} cloud - WeChat Cloud Development instance (wx.cloud)
  * @param {string} collectionName - Collection name
+ * @param {Object} [options] - Optional configuration
+ * @param {Object} [options.logger] - Logger instance for logging operations
  * @returns {Object} Object containing database operation methods
  */
-const createCollection = (cloud, collectionName) => {
+const createCollection = (cloud, collectionName, options = {}) => {
   if (!cloud || !cloud.database) {
     throw new Error('Cloud instance is required and must have database method');
   }
@@ -48,6 +50,7 @@ const createCollection = (cloud, collectionName) => {
 
   const db = cloud.database();
   const collection = db.collection(collectionName);
+  const logger = options.logger;
 
   // Export db.command for user usage
   const _ = db.command;
@@ -64,17 +67,22 @@ const createCollection = (cloud, collectionName) => {
       }
 
       try {
+        logger && logger.debug(`Creating document in collection ${collectionName}`);
+
         const result = await collection.add({
           data: doc
         });
 
         handleDbResult(result, 'create');
 
+        logger && logger.debug(`Document created with _id: ${result._id}`);
+
         return {
           _id: result._id,
           ...doc
         };
       } catch (error) {
+        logger && logger.error(`Create document failed in ${collectionName}: ${error.message}`);
         throw new Error(`Create document failed: ${error.message}`);
       }
     },
@@ -84,6 +92,7 @@ const createCollection = (cloud, collectionName) => {
      * @param {string|Object} condition - Document ID string or where query object
      * @param {Object} updateDoc - Fields to update
      * @returns {Object} {success: boolean, count: number}
+     * @throws {Error} When update operation fails
      */
     async update(condition, updateDoc) {
       if (!condition) {
@@ -94,6 +103,8 @@ const createCollection = (cloud, collectionName) => {
       }
 
       try {
+        logger && logger.debug(`Updating document(s) in collection ${collectionName}`);
+
         let query;
 
         if (typeof condition === 'string') {
@@ -108,16 +119,15 @@ const createCollection = (cloud, collectionName) => {
 
         handleDbResult(result, 'update');
 
+        logger && logger.debug(`Updated ${result.stats?.updated || 0} document(s)`);
+
         return {
           success: true,
           count: result.stats?.updated || 0
         };
       } catch (error) {
-        return {
-          success: false,
-          count: 0,
-          error: error.message
-        };
+        logger && logger.error(`Update document failed in ${collectionName}: ${error.message}`);
+        throw new Error(`Update document failed: ${error.message}`);
       }
     },
 
@@ -132,6 +142,8 @@ const createCollection = (cloud, collectionName) => {
       }
 
       try {
+        logger && logger.debug(`Deleting document(s) in collection ${collectionName}`);
+
         let query;
         let deletedIds = [];
 
@@ -150,8 +162,11 @@ const createCollection = (cloud, collectionName) => {
         const result = await query.remove();
         handleDbResult(result, 'delete');
 
+        logger && logger.debug(`Deleted ${deletedIds.length} document(s)`);
+
         return deletedIds;
       } catch (error) {
+        logger && logger.error(`Delete document failed in ${collectionName}: ${error.message}`);
         throw new Error(`Delete document failed: ${error.message}`);
       }
     },
@@ -167,22 +182,30 @@ const createCollection = (cloud, collectionName) => {
       }
 
       try {
+        logger && logger.debug(`Finding document in collection ${collectionName}`);
+
         let query;
 
         if (typeof condition === 'string') {
           query = collection.doc(condition);
           const result = await query.get();
           handleDbResult(result, 'find by id');
+
+          logger && logger.debug(`Found document by id: ${condition}`);
+
           return result.data || null;
         } else {
           query = collection.where(condition).limit(1);
           const result = await query.get();
           handleDbResult(result, 'find by condition');
+
+          logger && logger.debug(`Found ${result.data?.length || 0} document(s) by condition`);
+
           return result.data?.[0] || null;
         }
       } catch (error) {
         // Return null when find operation fails, instead of throwing exception
-        console.warn(`Find document failed: ${error.message}`);
+        logger && logger.warn(`Find document failed in ${collectionName}: ${error.message}`);
         return null;
       }
     },
@@ -194,6 +217,8 @@ const createCollection = (cloud, collectionName) => {
      */
     async all(where = {}) {
       try {
+        logger && logger.debug(`Querying all documents in collection ${collectionName}`);
+
         const query = Object.keys(where).length > 0
           ? collection.where(where)
           : collection;
@@ -201,8 +226,11 @@ const createCollection = (cloud, collectionName) => {
         const result = await query.get();
         handleDbResult(result, 'find all');
 
+        logger && logger.debug(`Found ${result.data?.length || 0} document(s)`);
+
         return result.data || [];
       } catch (error) {
+        logger && logger.error(`Query documents failed in ${collectionName}: ${error.message}`);
         throw new Error(`Query documents failed: ${error.message}`);
       }
     },
