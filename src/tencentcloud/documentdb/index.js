@@ -212,16 +212,80 @@ const createCollection = (cloud, collectionName, options = {}) => {
 
     /**
      * Find multiple documents
-     * @param {Object} where - Query condition object, defaults to empty object
+     * @param {Object} [queryOptions]
+     * @param {Object} [queryOptions.where] - Query conditions object
+     * @param {Object} [queryOptions.orderBy] - Map of field to sort direction ('asc'|'desc')
+     * @param {number} [queryOptions.limit] - Max number of documents to return
+     * @param {number} [queryOptions.skip] - Number of documents to skip (pagination)
+     * @param {Object} [queryOptions.field] - Field projection definition
      * @returns {Array<Object>} Array of documents
      */
-    async all(where = {}) {
+    async all(queryOptions = {}) {
       try {
-        logger && logger.debug(`Querying all documents in collection ${collectionName}`);
+        logger && logger.debug(`Querying documents in collection ${collectionName}`);
 
-        const query = Object.keys(where).length > 0
-          ? collection.where(where)
-          : collection;
+        if (queryOptions !== undefined && (typeof queryOptions !== 'object' || Array.isArray(queryOptions))) {
+          throw new Error('Query options must be an object');
+        }
+
+        const {
+          where,
+          orderBy,
+          limit,
+          skip,
+          field
+        } = queryOptions || {};
+
+        let query = collection;
+
+        if (where !== undefined) {
+          if (!where || typeof where !== 'object' || Array.isArray(where)) {
+            throw new Error('`where` must be an object');
+          }
+
+          if (Object.keys(where).length > 0) {
+            query = query.where(where);
+          }
+        }
+
+        if (orderBy !== undefined) {
+          if (!orderBy || typeof orderBy !== 'object' || Array.isArray(orderBy)) {
+            throw new Error('`orderBy` must be an object with field: direction pairs');
+          }
+
+          for (const [fieldName, direction] of Object.entries(orderBy)) {
+            if (typeof fieldName !== 'string' || !fieldName) {
+              throw new Error('`orderBy` field names must be non-empty strings');
+            }
+            if (direction !== 'asc' && direction !== 'desc') {
+              throw new Error('`orderBy` direction must be either "asc" or "desc"');
+            }
+            query = query.orderBy(fieldName, direction);
+          }
+        }
+
+        if (limit !== undefined) {
+          if (typeof limit !== 'number' || !Number.isFinite(limit) || limit <= 0) {
+            throw new Error('`limit` must be a positive number');
+          }
+          query = query.limit(limit);
+        }
+
+        if (skip !== undefined) {
+          if (typeof skip !== 'number' || !Number.isFinite(skip) || skip < 0) {
+            throw new Error('`skip` must be a non-negative number');
+          }
+          query = query.skip(skip);
+        }
+
+        if (field !== undefined) {
+          if (!field || typeof field !== 'object' || Array.isArray(field)) {
+            throw new Error('`field` must be an object');
+          }
+          if (Object.keys(field).length > 0) {
+            query = query.field(field);
+          }
+        }
 
         const result = await query.get();
         handleDbResult(result, 'find all');
