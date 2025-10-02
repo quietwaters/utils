@@ -1,166 +1,110 @@
-const winston = require('winston');
-const { Writable } = require('stream');
+const flushLogs = () => new Promise((resolve) => setImmediate(resolve));
 
-// Helper function to create a logger with captured output
-function createTestLogger(options = {}) {
-  const output = [];
+describe('log module', () => {
+  let log;
+  let winston;
+  let outputChunks;
+  let captureStream;
 
-  const captureStream = new Writable({
-    write(chunk, encoding, callback) {
-      output.push(chunk.toString().trim());
-      callback();
-    }
-  });
+  const getLines = () =>
+    outputChunks
+      .join('')
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length);
 
-  const logger = winston.createLogger({
-    level: options.level || 'info',
-    format: winston.format.combine(
-      winston.format.timestamp({ format: () => new Date().toISOString() }),
-      winston.format.printf(({ timestamp, level, message, ...meta }) => {
-        // Extract context fields (those set via getLogger)
-        const contextParts = [];
+  beforeEach(() => {
+    jest.resetModules();
+    outputChunks = [];
 
-        // Build context string with key: value format
-        for (const [key, value] of Object.entries(meta)) {
-          if (value !== undefined && value !== null && key !== 'splat') {
-            contextParts.push(`${key}: ${value}`);
-          }
-        }
+    const { Writable } = require('stream');
+    captureStream = new Writable({
+      write(chunk, encoding, callback) {
+        outputChunks.push(chunk.toString());
+        callback();
+      }
+    });
 
-        const contextStr = contextParts.length ? contextParts.join(' ') : '';
-        const separator = contextStr ? ' - ' : '';
-
-        return `${timestamp} [${level.toUpperCase()}] ${contextStr}${separator}${message}`;
-      })
-    ),
-    transports: [
+    winston = require('winston');
+    ({ log } = require('../src/log'));
+    log.__setTransportFactory(() => [
       new winston.transports.Stream({ stream: captureStream })
-    ]
+    ]);
+    log.level = 'info';
   });
 
-  return { logger, output };
-}
+  afterEach(() => {
+    log.__reset();
+  });
 
-describe('Log module', () => {
-
-  test('should format log with level in brackets', () => {
-    const { logger, output } = createTestLogger();
+  test('formats level tag in uppercase', async () => {
+    const logger = log.getLogger();
     logger.info('Test message');
+    await flushLogs();
 
-    expect(output[0]).toMatch(/\[INFO\]/);
+    const [line] = getLines();
+    expect(line).toEqual(expect.stringContaining('[INFO]'));
   });
 
-  test('should format log with context fields', () => {
-    const { logger, output } = createTestLogger();
-    const childLogger = logger.child({ requestId: 'abc123', userId: 'user456' });
-    childLogger.info('Test message');
-
-    expect(output[0]).toContain('requestId: abc123');
-    expect(output[0]).toContain('userId: user456');
-  });
-
-  test('should separate context and message with " - "', () => {
-    const { logger, output } = createTestLogger();
-    const childLogger = logger.child({ requestId: 'abc123' });
-    childLogger.info('Test message');
-
-    expect(output[0]).toMatch(/requestId: abc123 - Test message/);
-  });
-
-  test('should not add separator when no context fields', () => {
-    const { logger, output } = createTestLogger();
+  test('includes context fields from child logger', async () => {
+    const logger = log.getLogger({ requestId: 'abc123', userId: 'user456' });
     logger.info('Test message');
+    await flushLogs();
 
-    expect(output[0]).not.toContain(' - ');
-    expect(output[0]).toContain('Test message');
+    const [line] = getLines();
+    expect(line).toEqual(expect.stringContaining('requestId: abc123'));
+    expect(line).toEqual(expect.stringContaining('userId: user456'));
   });
 
-  test('should handle multiple log levels', () => {
-    const { logger, output } = createTestLogger();
-    const childLogger = logger.child({ requestId: 'abc123' });
-
-    childLogger.error('Error message');
-    childLogger.warn('Warning message');
-    childLogger.info('Info message');
-    childLogger.debug('Debug message');
-
-    expect(output[0]).toContain('[ERROR]');
-    expect(output[1]).toContain('[WARN]');
-    expect(output[2]).toContain('[INFO]');
-    // Debug won't appear because default level is 'info'
-    expect(output).toHaveLength(3);
-  });
-
-  test('should include timestamp in ISO format', () => {
-    const { logger, output } = createTestLogger();
+  test('separates context and message with hyphen', async () => {
+    const logger = log.getLogger({ requestId: 'abc123' });
     logger.info('Test message');
+    await flushLogs();
 
-    // Check for ISO timestamp pattern (YYYY-MM-DDTHH:mm:ss.sssZ)
-    expect(output[0]).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/);
+    const [line] = getLines();
+    expect(line).toMatch(/requestId: abc123 - Test message$/);
   });
 
-  test('should respect log level when filtering messages', () => {
-    const { logger, output } = createTestLogger({ level: 'error' });
+  test('omits hyphen when no context fields present', async () => {
+    const logger = log.getLogger();
+    logger.info('Test message');
+    await flushLogs();
+
+    const [line] = getLines();
+    expect(line).not.toContain(' - ');
+    expect(line).toMatch(/\[INFO\] .*Test message$/);
+  });
+
+  test('respects configured log level', async () => {
+    log.level = 'error';
+    const logger = log.getLogger({ requestId: 'abc123' });
 
     logger.debug('Debug message');
     logger.info('Info message');
     logger.error('Error message');
+    await flushLogs();
 
-    // Only error message should appear
-    expect(output).toHaveLength(1);
-    expect(output[0]).toContain('[ERROR]');
-    expect(output[0]).toContain('Error message');
+    const lines = getLines();
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/\[ERROR\] requestId: abc123 - Error message$/);
   });
 
-  test('should handle multiple context fields in order', () => {
-    const { logger, output } = createTestLogger();
-    const childLogger = logger.child({
-      requestId: 'req123',
-      userId: 'user456',
-      sessionId: 'sess789'
-    });
-    childLogger.info('Test message');
+  test('includes extra arguments in message output', async () => {
+    log.level = 'debug';
+    const logger = log.getLogger({ requestId: 1, openId: 2 });
+    logger.debug('hello', 'world', { obj: 3 });
+    await flushLogs();
 
-    const line = output[0];
-    expect(line).toContain('requestId: req123');
-    expect(line).toContain('userId: user456');
-    expect(line).toContain('sessionId: sess789');
-    expect(line).toMatch(/requestId: req123.*userId: user456.*sessionId: sess789 - Test message/);
+    const [line] = getLines();
+    expect(line).toMatch(/\[DEBUG\] requestId: 1 openId: 2 - hello world {obj: 3}$/);
   });
 
-  test('should handle empty context object', () => {
-    const { logger, output } = createTestLogger();
-    const childLogger = logger.child({});
-    childLogger.info('Test message');
+  test('prefixes log line with ISO timestamp', async () => {
+    const logger = log.getLogger();
+    logger.info('Test message');
+    await flushLogs();
 
-    expect(output[0]).not.toContain(' - ');
-    expect(output[0]).toContain('Test message');
-  });
-
-  test('should ignore undefined and null context values', () => {
-    const { logger, output } = createTestLogger();
-    const childLogger = logger.child({
-      requestId: 'abc123',
-      undefinedField: undefined,
-      nullField: null,
-      validField: 'valid'
-    });
-    childLogger.info('Test message');
-
-    const line = output[0];
-    expect(line).toContain('requestId: abc123');
-    expect(line).toContain('validField: valid');
-    expect(line).not.toContain('undefinedField');
-    expect(line).not.toContain('nullField');
-  });
-
-  test('complete format: timestamp [LEVEL] context - message', () => {
-    const { logger, output } = createTestLogger();
-    const childLogger = logger.child({ requestId: 'abc123', userId: 'user456' });
-    childLogger.info('User logged in');
-
-    const line = output[0];
-    // Check complete format structure
-    expect(line).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z \[INFO\] requestId: abc123 userId: user456 - User logged in$/);
+    const [line] = getLines();
+    expect(line).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z \[INFO\]/);
   });
 });

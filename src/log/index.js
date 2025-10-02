@@ -1,4 +1,5 @@
 const winston = require('winston');
+const util = require('util');
 
 /**
  * Log utility that wraps winston for consistent logging
@@ -6,6 +7,34 @@ const winston = require('winston');
  */
 
 let rootLogger;
+let transportFactory;
+
+function getTransportFactory() {
+  if (!transportFactory) {
+    transportFactory = () => [
+      new winston.transports.Console()
+    ];
+  }
+  return transportFactory;
+}
+
+function formatValue(value) {
+  if (value instanceof Error) {
+    return value.stack || value.message;
+  }
+  if (typeof value === 'object' && value !== null) {
+    const inspected = util.inspect(value, { depth: null, breakLength: Infinity });
+    return inspected
+      .replace(/^{\s+/, '{')
+      .replace(/\s+}$/, '}')
+      .replace(/^\[\s+/, '[')
+      .replace(/\s+\]$/, ']');
+  }
+  if (value === undefined || value === null) {
+    return '';
+  }
+  return String(value);
+}
 
 // Create root logger with default configuration
 function createRootLogger() {
@@ -13,26 +42,39 @@ function createRootLogger() {
     level: 'info',
     format: winston.format.combine(
       winston.format.timestamp({ format: () => new Date().toISOString() }),
-      winston.format.printf(({ timestamp, level, message, ...meta }) => {
+      winston.format.printf((info) => {
+        const { timestamp, level } = info;
+        const messageValue = formatValue(info.message);
+        const splat = info[Symbol.for('splat')] || [];
+
         // Extract context fields (those set via getLogger)
         const contextParts = [];
-
-        // Build context string with key: value format
-        for (const [key, value] of Object.entries(meta)) {
-          if (value !== undefined && value !== null && key !== 'splat') {
+        for (const [key, value] of Object.entries(info)) {
+          if (['timestamp', 'level', 'message'].includes(key)) {
+            continue;
+          }
+          if (value !== undefined && value !== null) {
             contextParts.push(`${key}: ${value}`);
           }
         }
 
-        const contextStr = contextParts.length ? contextParts.join(' ') : '';
-        const separator = contextStr ? ' - ' : '';
+        const contextStr = contextParts.join(' ');
 
-        return `${timestamp} [${level.toUpperCase()}] ${contextStr}${separator}${message}`;
+        const formattedExtras = splat
+          .map((value) => formatValue(value))
+          .filter((part) => part.length > 0);
+
+        const messageParts = [messageValue, ...formattedExtras].filter((part) => part.length > 0);
+        const messageStr = messageParts.join(' ');
+
+        const header = `${timestamp} [${level.toUpperCase()}]`;
+        const contextSegment = contextStr ? ` ${contextStr}` : '';
+        const messageSegment = messageStr ? `${contextStr ? ' - ' : ' '}${messageStr}` : '';
+
+        return `${header}${contextSegment}${messageSegment}`;
       })
     ),
-    transports: [
-      new winston.transports.Console()
-    ]
+    transports: getTransportFactory()()
   });
 }
 
@@ -57,6 +99,17 @@ const log = {
     }
 
     return rootLogger.child(options);
+  },
+
+  // Test hooks
+  __setTransportFactory(factory) {
+    transportFactory = factory;
+    rootLogger = undefined;
+  },
+
+  __reset() {
+    transportFactory = undefined;
+    rootLogger = undefined;
   }
 };
 
